@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Hi, {{ user['username'] }}</h4>
+    <div class="btn-group btn-group-sm mt-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('dashboard', month=prev_month) }}">&laquo;</a>
+      <span class="btn btn-outline-secondary disabled">{{ month }}</span>
+      <a class="btn btn-outline-secondary" href="{{ url_for('dashboard', month=next_month) }}">&raquo;</a>
+    </div>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('add_transaction') }}">+ Add transaction</a>
+</div>
+
+{% if over_budget %}
+  <div class="alert alert-danger">Over budget! You spent {{ '%.2f'|format(expense) }} of your {{ '%.2f'|format(budget) }} budget.</div>
+{% elif near_budget %}
+  <div class="alert alert-warning">Careful: you have used {{ pct }}% of your monthly budget.</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <div class="text-muted small">Income</div><div class="fs-4 text-success">{{ '%.2f'|format(income) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <div class="text-muted small">Expenses</div><div class="fs-4 text-danger">{{ '%.2f'|format(expense) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <div class="text-muted small">Balance</div><div class="fs-4">{{ '%.2f'|format(balance) }}</div></div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <div class="text-muted small">Forecast next month</div><div class="fs-4">{{ '%.2f'|format(forecast) }}</div>
+    <div class="text-muted" style="font-size:.7rem">avg of last 3 months' spending</div></div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <h6>Spending by category</h6>
+    {% if chart_labels %}
+      <canvas id="catChart" height="220"></canvas>
+    {% else %}
+      <p class="text-muted mb-0">No expenses this month yet.</p>
+    {% endif %}
+  </div></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <h6>Monthly budget</h6>
+    <form method="post" action="{{ url_for('set_budget') }}" class="d-flex gap-2">
+      <input class="form-control" type="number" step="0.01" min="0" name="budget" value="{{ budget }}">
+      <button class="btn btn-outline-primary">Save</button>
+    </form>
+    {% if pct is not none %}
+      <div class="progress mt-3" style="height:20px">
+        <div class="progress-bar {{ 'bg-danger' if over_budget else ('bg-warning' if near_budget else 'bg-success') }}"
+             style="width: {{ [pct, 100]|min }}%">{{ pct }}%</div>
+      </div>
+    {% else %}
+      <p class="text-muted small mt-3 mb-0">Set a budget above to get alerts. Use 0 to turn alerts off.</p>
+    {% endif %}
+  </div></div></div>
+</div>
+
+<div class="card"><div class="card-body">
+  <h6>Transactions in {{ month }}</h6>
+  {% if rows %}
+  <div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="text-end">Amount</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r['tx_date'] }}</td><td>{{ r['category'] }}</td><td>{{ r['note'] }}</td>
+        <td class="text-end {{ 'text-success' if r['kind'] == 'income' else 'text-danger' }}">
+          {{ '+' if r['kind'] == 'income' else '-' }}{{ '%.2f'|format(r['amount']) }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('edit_transaction', tx_id=r['id']) }}">Edit</a>
+          <form class="d-inline" method="post" action="{{ url_for('delete_transaction', tx_id=r['id']) }}"
+                onsubmit="return confirm('Delete this transaction?')">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <p class="text-muted mb-0">No transactions this month.</p>
+  {% endif %}
+</div></div>
+
+{% if chart_labels %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  new Chart(document.getElementById('catChart'), {
+    type: 'pie',
+    data: {
+      labels: {{ chart_labels|tojson }},
+      datasets: [{ data: {{ chart_values|tojson }} }]
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}
